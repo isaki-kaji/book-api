@@ -78,6 +78,5 @@ sourceSets.main {
 }
 
 tasks.named("jooqCodegen") {
-	dependsOn("flywayMigrate")
 	inputs.files(fileTree("src/main/resources/db/migration"))
 }
