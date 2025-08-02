@@ -9,4 +9,3 @@ services:
       POSTGRES_DB: book
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-

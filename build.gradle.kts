@@ -22,6 +22,7 @@ repositories {
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-jooq")
+	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.flywaydb:flyway-core:10.15.0")
 	implementation("org.flywaydb:flyway-database-postgresql:10.15.0")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
