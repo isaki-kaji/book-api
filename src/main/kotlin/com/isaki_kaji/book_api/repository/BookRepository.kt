@@ -33,4 +33,14 @@ interface BookRepository {
      * 指定された書籍IDリストで書籍を取得する
      */
     fun findByIds(ids: List<Long>): List<Book>
+    
+    /**
+     * 指定されたタイトルと著者IDリストで書籍が存在するかチェックする
+     */
+    fun existsByTitleAndAuthorIds(title: String, authorIds: List<Long>): Boolean
+    
+    /**
+     * 指定されたタイトルと著者IDリストで書籍が存在するかチェックする（指定IDを除外）
+     */
+    fun existsByTitleAndAuthorIdsExcluding(title: String, authorIds: List<Long>, excludeBookId: Long): Boolean
 }

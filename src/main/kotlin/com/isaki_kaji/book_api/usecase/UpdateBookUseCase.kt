@@ -4,6 +4,7 @@ import com.isaki_kaji.book_api.domain.Author
 import com.isaki_kaji.book_api.dto.AuthorRequest
 import com.isaki_kaji.book_api.dto.BookUpdateRequest
 import com.isaki_kaji.book_api.dto.BookResponse
+import com.isaki_kaji.book_api.exception.DuplicateResourceException
 import com.isaki_kaji.book_api.exception.ResourceNotFoundException
 import com.isaki_kaji.book_api.repository.AuthorRepository
 import com.isaki_kaji.book_api.repository.BookRepository
@@ -32,6 +33,13 @@ class UpdateBookUseCase(
         
         // 著者の処理（重複チェック + 新規作成 or 既存使用）
         val authors = authorProcessor.processAuthors(request.authors)
+        
+        // 同じタイトルと著者の組み合わせで他の書籍が既に存在するかチェック（自分自身は除外）
+        val authorIds = authors.map { it.id!! }
+        if (bookRepository.existsByTitleAndAuthorIdsExcluding(request.title, authorIds, id)) {
+            val authorNames = authors.joinToString(", ") { it.name }
+            throw DuplicateResourceException("書籍「${request.title}」は著者「${authorNames}」で既に登録されています")
+        }
         
         // 書籍の基本情報を更新
         bookRepository.updateBasicInfo(id, request.title, request.getPrice())

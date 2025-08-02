@@ -36,6 +36,65 @@ class BookRepositoryImpl(
         )
     }
     
+    override fun existsByTitleAndAuthorIds(title: String, authorIds: List<Long>): Boolean {
+        if (authorIds.isEmpty()) return false
+        
+        // 指定されたタイトルの書籍を取得
+        val booksWithTitle = dsl.select(BOOKS.ID)
+            .from(BOOKS)
+            .where(BOOKS.TITLE.eq(title))
+            .fetch()
+            .map { it.get(BOOKS.ID) }
+        
+        if (booksWithTitle.isEmpty()) return false
+        
+        // 各書籍について、著者IDリストが完全一致するかチェック
+        for (bookId in booksWithTitle) {
+            val bookAuthorIds = dsl.select(BOOK_AUTHORS.AUTHOR_ID)
+                .from(BOOK_AUTHORS)
+                .where(BOOK_AUTHORS.BOOK_ID.eq(bookId))
+                .fetch()
+                .map { it.get(BOOK_AUTHORS.AUTHOR_ID) }
+                .sorted()
+            
+            if (bookAuthorIds == authorIds.sorted()) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    override fun existsByTitleAndAuthorIdsExcluding(title: String, authorIds: List<Long>, excludeBookId: Long): Boolean {
+        if (authorIds.isEmpty()) return false
+        
+        // 指定されたタイトルの書籍を取得（除外IDを除く）
+        val booksWithTitle = dsl.select(BOOKS.ID)
+            .from(BOOKS)
+            .where(BOOKS.TITLE.eq(title))
+            .and(BOOKS.ID.ne(excludeBookId))
+            .fetch()
+            .map { it.get(BOOKS.ID) }
+        
+        if (booksWithTitle.isEmpty()) return false
+        
+        // 各書籍について、著者IDリストが完全一致するかチェック
+        for (bookId in booksWithTitle) {
+            val bookAuthorIds = dsl.select(BOOK_AUTHORS.AUTHOR_ID)
+                .from(BOOK_AUTHORS)
+                .where(BOOK_AUTHORS.BOOK_ID.eq(bookId))
+                .fetch()
+                .map { it.get(BOOK_AUTHORS.AUTHOR_ID) }
+                .sorted()
+            
+            if (bookAuthorIds == authorIds.sorted()) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
     override fun findByIdWithAuthors(id: Long): Book? {
         val result = dsl.select(
             BOOKS.ID,

@@ -5,6 +5,7 @@ import com.isaki_kaji.book_api.domain.Book
 import com.isaki_kaji.book_api.dto.AuthorRequest
 import com.isaki_kaji.book_api.dto.BookCreateRequest
 import com.isaki_kaji.book_api.dto.BookResponse
+import com.isaki_kaji.book_api.exception.DuplicateResourceException
 import com.isaki_kaji.book_api.repository.AuthorRepository
 import com.isaki_kaji.book_api.repository.BookRepository
 import com.isaki_kaji.book_api.repository.BookAuthorRepository
@@ -29,6 +30,13 @@ class CreateBookUseCase(
     fun execute(request: BookCreateRequest): BookResponse {
         // 著者の処理（重複チェック + 新規作成 or 既存使用）
         val authors = authorProcessor.processAuthors(request.authors)
+        
+        // 同じタイトルと著者の組み合わせで書籍が既に存在するかチェック
+        val authorIds = authors.map { it.id!! }
+        if (bookRepository.existsByTitleAndAuthorIds(request.title, authorIds)) {
+            val authorNames = authors.joinToString(", ") { it.name }
+            throw DuplicateResourceException("書籍「${request.title}」は著者「${authorNames}」で既に登録されています")
+        }
         
         // 書籍を作成
         val book = Book.create(
