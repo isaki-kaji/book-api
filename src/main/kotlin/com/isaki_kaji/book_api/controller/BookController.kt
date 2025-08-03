@@ -3,10 +3,9 @@ package com.isaki_kaji.book_api.controller
 import com.isaki_kaji.book_api.dto.BookCreateRequest
 import com.isaki_kaji.book_api.dto.BookUpdateRequest
 import com.isaki_kaji.book_api.dto.BookResponse
-import com.isaki_kaji.book_api.dto.PublicationStatusUpdateRequest
 import com.isaki_kaji.book_api.usecase.CreateBookUseCase
 import com.isaki_kaji.book_api.usecase.UpdateBookUseCase
-import com.isaki_kaji.book_api.usecase.UpdatePublicationStatusUseCase
+import com.isaki_kaji.book_api.usecase.PublishBookUseCase
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -20,7 +19,7 @@ import org.springframework.web.bind.annotation.*
 class BookController(
     private val createBookUseCase: CreateBookUseCase,
     private val updateBookUseCase: UpdateBookUseCase,
-    private val updatePublicationStatusUseCase: UpdatePublicationStatusUseCase
+    private val publishBookUseCase: PublishBookUseCase
 ) {
     
     /**
@@ -47,15 +46,12 @@ class BookController(
     }
     
     /**
-     * 出版状況を更新する
-     * PATCH /api/books/{id}/publication-status
+     * 書籍を出版する
+     * PATCH /api/books/{id}/publish
      */
-    @PatchMapping("/{id}/publication-status")
-    fun updatePublicationStatus(
-        @PathVariable id: Long,
-        @Valid @RequestBody request: PublicationStatusUpdateRequest
-    ): ResponseEntity<BookResponse> {
-        val response = updatePublicationStatusUseCase.execute(id, request)
+    @PatchMapping("/{id}/publish")
+    fun publishBook(@PathVariable id: Long): ResponseEntity<BookResponse> {
+        val response = publishBookUseCase.execute(id)
         return ResponseEntity.ok(response)
     }
 }

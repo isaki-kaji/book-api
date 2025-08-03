@@ -4,7 +4,7 @@
 - `PUT /api/authors/{id}` - 著者更新
 - `POST /api/books` - 書籍登録（著者も同時登録可能）
 - `PUT /api/books/{id}` - 書籍更新（タイトル、価格、著者）
-- `PATCH /api/books/{id}/publication-status` - 出版状況更新
+- `PATCH /api/books/{id}/publish` - 書籍出版（冪等性あり）
 - `GET /api/authors/{id}/books` - 著者の書籍一覧取得
 
 ## セットアップ・実行手順

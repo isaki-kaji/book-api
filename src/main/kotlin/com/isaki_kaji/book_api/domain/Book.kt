@@ -49,16 +49,10 @@ data class Book(
     }
     
     /**
-     * 出版状況を更新する
-     * ビジネスルール: 出版済みから未出版への変更は不可
+     * 書籍を出版する
+     * ビジネスルール: 未出版の書籍のみ出版可能、出版済みの場合は状態を維持
      */
-    fun updatePublicationStatus(newStatus: PublicationStatus): Book {
-        if (!publicationStatus.canChangeTo(newStatus)) {
-            throw IllegalStateException(
-                "出版済みの書籍を未出版に戻すことはできません。" +
-                "現在: $publicationStatus, 変更先: $newStatus"
-            )
-        }
-        return copy(publicationStatus = newStatus)
+    fun publish(): Book {
+        return copy(publicationStatus = publicationStatus.publish())
     }
 }

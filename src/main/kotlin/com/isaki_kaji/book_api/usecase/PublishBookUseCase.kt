@@ -25,8 +25,8 @@ class PublishBookUseCase(
         val existingBook = bookRepository.findByIdWithAuthors(id)
             ?: throw ResourceNotFoundException("書籍が見つかりません。ID: $id")
         
-        // ドメインモデルで出版処理
-        val publishedDomainBook = existingBook.publish()
+        // ドメインモデルで出版処理（ビジネスルールの確認）
+        existingBook.publish()
         
         // データベースの更新（冪等性のため、常に PUBLISHED に設定）
         bookRepository.updatePublicationStatus(id, PublicationStatus.PUBLISHED)

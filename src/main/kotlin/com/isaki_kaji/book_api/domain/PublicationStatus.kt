@@ -8,13 +8,16 @@ enum class PublicationStatus {
     PUBLISHED;
     
     /**
-     * 指定された状況への変更が可能かを判定する
-     * ビジネスルール: 出版済みから未出版への変更は不可
+     * 書籍を出版する
+     * ビジネスルール: 未出版の書籍のみ出版可能、出版済みの書籍は出版済みのまま
+     * 
+     * @return 出版後のステータス
+     * @throws IllegalStateException 出版済みから未出版への変更を試みた場合
      */
-    fun canChangeTo(newStatus: PublicationStatus): Boolean {
+    fun publish(): PublicationStatus {
         return when (this) {
-            UNPUBLISHED -> true  // 未出版からはどちらにも変更可能
-            PUBLISHED -> newStatus == PUBLISHED  // 出版済みからは出版済みのみ
+            UNPUBLISHED -> PUBLISHED  // 未出版から出版済みに変更
+            PUBLISHED -> PUBLISHED    // 出版済みは出版済みのまま（冪等性）
         }
     }
 }
