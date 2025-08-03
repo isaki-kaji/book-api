@@ -12,7 +12,6 @@ enum class PublicationStatus {
      * ビジネスルール: 未出版の書籍のみ出版可能、出版済みの書籍は出版済みのまま
      * 
      * @return 出版後のステータス
-     * @throws IllegalStateException 出版済みから未出版への変更を試みた場合
      */
     fun publish(): PublicationStatus {
         return when (this) {
