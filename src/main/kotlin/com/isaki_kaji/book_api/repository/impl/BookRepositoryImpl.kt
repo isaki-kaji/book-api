@@ -5,9 +5,9 @@ import com.isaki_kaji.book_api.domain.Book
 import com.isaki_kaji.book_api.domain.Price
 import com.isaki_kaji.book_api.domain.PublicationStatus
 import com.isaki_kaji.book_api.repository.BookRepository
-import org.example.db.tables.Authors.AUTHORS
-import org.example.db.tables.BookAuthors.BOOK_AUTHORS
-import org.example.db.tables.Books.BOOKS
+import org.example.db.tables.Authors
+import org.example.db.tables.BookAuthors
+import org.example.db.tables.Books
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
 
@@ -20,44 +20,138 @@ class BookRepositoryImpl(
 ) : BookRepository {
     
     override fun create(book: Book): Book {
-        val record = dsl.insertInto(BOOKS)
-            .set(BOOKS.TITLE, book.title)
-            .set(BOOKS.PRICE, book.price.toInt())
-            .set(BOOKS.PUBLICATION_STATUS, book.publicationStatus.ordinal.toShort())
+        val record = dsl.insertInto(Books.BOOKS)
+            .set(Books.BOOKS.TITLE, book.title)
+            .set(Books.BOOKS.PRICE, book.price.toInt())
+            .set(Books.BOOKS.PUBLICATION_STATUS, book.publicationStatus.ordinal.toShort())
             .returning()
             .fetchOne()
             ?: throw IllegalStateException("書籍の作成に失敗しました")
         
         return Book(
-            id = record.id,
-            title = record.title,
-            price = Price.of(record.price),
-            publicationStatus = PublicationStatus.entries[record.publicationStatus.toInt()]
+            id = record.id!!,
+            title = record.title!!,
+            price = Price.of(record.price!!),
+            publicationStatus = PublicationStatus.entries[record.publicationStatus!!.toInt()]
         )
     }
     
-    override fun existsByTitleAndAuthorIds(title: String, authorIds: List<Long>): Boolean {
-        if (authorIds.isEmpty()) return false
-        
-        // 指定されたタイトルの書籍を取得
-        val booksWithTitle = dsl.select(BOOKS.ID)
-            .from(BOOKS)
-            .where(BOOKS.TITLE.eq(title))
+    override fun findByIdWithAuthors(id: Long): Book? {
+        val result = dsl
+            .select(
+                Books.BOOKS.ID,
+                Books.BOOKS.TITLE,
+                Books.BOOKS.PRICE,
+                Books.BOOKS.PUBLICATION_STATUS,
+                Authors.AUTHORS.ID,
+                Authors.AUTHORS.NAME,
+                Authors.AUTHORS.BIRTH_DATE
+            )
+            .from(Books.BOOKS)
+            .leftJoin(BookAuthors.BOOK_AUTHORS).on(Books.BOOKS.ID.eq(BookAuthors.BOOK_AUTHORS.BOOK_ID))
+            .leftJoin(Authors.AUTHORS).on(BookAuthors.BOOK_AUTHORS.AUTHOR_ID.eq(Authors.AUTHORS.ID))
+            .where(Books.BOOKS.ID.eq(id))
             .fetch()
-            .map { it.get(BOOKS.ID) }
         
-        if (booksWithTitle.isEmpty()) return false
+        if (result.isEmpty()) {
+            return null
+        }
         
-        // 各書籍について、著者IDリストが完全一致するかチェック
+        val bookRecord = result.first()
+        val authors = result.mapNotNull { record ->
+            val authorId = record.get(Authors.AUTHORS.ID)
+            if (authorId != null) {
+                Author(
+                    id = authorId,
+                    name = record.get(Authors.AUTHORS.NAME)!!,
+                    birthDate = record.get(Authors.AUTHORS.BIRTH_DATE)
+                )
+            } else null
+        }.distinctBy { it.id }
+        
+        return Book(
+            id = bookRecord.get(Books.BOOKS.ID)!!,
+            title = bookRecord.get(Books.BOOKS.TITLE)!!,
+            price = Price.of(bookRecord.get(Books.BOOKS.PRICE)!!),
+            publicationStatus = PublicationStatus.entries[bookRecord.get(Books.BOOKS.PUBLICATION_STATUS)!!.toInt()],
+            authors = authors
+        )
+    }
+    
+    override fun updateBasicInfo(id: Long, title: String, price: Price): Book {
+        val record = dsl.update(Books.BOOKS)
+            .set(Books.BOOKS.TITLE, title)
+            .set(Books.BOOKS.PRICE, price.toInt())
+            .where(Books.BOOKS.ID.eq(id))
+            .returning()
+            .fetchOne()
+            ?: throw IllegalStateException("書籍の更新に失敗しました。ID: $id")
+        
+        return Book(
+            id = record.id!!,
+            title = record.title!!,
+            price = Price.of(record.price!!),
+            publicationStatus = PublicationStatus.entries[record.publicationStatus!!.toInt()]
+        )
+    }
+    
+    override fun updatePublicationStatus(id: Long, publicationStatus: PublicationStatus): Book {
+        val record = dsl.update(Books.BOOKS)
+            .set(Books.BOOKS.PUBLICATION_STATUS, publicationStatus.ordinal.toShort())
+            .where(Books.BOOKS.ID.eq(id))
+            .returning()
+            .fetchOne()
+            ?: throw IllegalStateException("書籍の更新に失敗しました。ID: $id")
+        
+        return Book(
+            id = record.id!!,
+            title = record.title!!,
+            price = Price.of(record.price!!),
+            publicationStatus = PublicationStatus.entries[record.publicationStatus!!.toInt()]
+        )
+    }
+    
+    override fun findByIds(ids: List<Long>): List<Book> {
+        if (ids.isEmpty()) return emptyList()
+        
+        return dsl.selectFrom(Books.BOOKS)
+            .where(Books.BOOKS.ID.`in`(ids))
+            .fetch()
+            .map { record ->
+                Book(
+                    id = record.id!!,
+                    title = record.title!!,
+                    price = Price.of(record.price!!),
+                    publicationStatus = PublicationStatus.entries[record.publicationStatus!!.toInt()]
+                )
+            }
+    }
+    
+    override fun existsByTitleAndAuthorIds(title: String, authorIds: List<Long>): Boolean {
+        if (authorIds.isEmpty()) {
+            return false
+        }
+        
+        val booksWithTitle = dsl.select(Books.BOOKS.ID)
+            .from(Books.BOOKS)
+            .where(Books.BOOKS.TITLE.eq(title))
+            .fetch()
+            .map { it.get(Books.BOOKS.ID)!! }
+        
+        if (booksWithTitle.isEmpty()) {
+            return false
+        }
+        
+        val authorIdsSet = authorIds.toSet()
         for (bookId in booksWithTitle) {
-            val bookAuthorIds = dsl.select(BOOK_AUTHORS.AUTHOR_ID)
-                .from(BOOK_AUTHORS)
-                .where(BOOK_AUTHORS.BOOK_ID.eq(bookId))
+            val bookAuthorIds = dsl.select(BookAuthors.BOOK_AUTHORS.AUTHOR_ID)
+                .from(BookAuthors.BOOK_AUTHORS)
+                .where(BookAuthors.BOOK_AUTHORS.BOOK_ID.eq(bookId))
                 .fetch()
-                .map { it.get(BOOK_AUTHORS.AUTHOR_ID) }
-                .sorted()
+                .map { it.get(BookAuthors.BOOK_AUTHORS.AUTHOR_ID)!! }
+                .toSet()
             
-            if (bookAuthorIds == authorIds.sorted()) {
+            if (bookAuthorIds == authorIdsSet) {
                 return true
             }
         }
@@ -66,144 +160,35 @@ class BookRepositoryImpl(
     }
     
     override fun existsByTitleAndAuthorIdsExcluding(title: String, authorIds: List<Long>, excludeBookId: Long): Boolean {
-        if (authorIds.isEmpty()) return false
+        if (authorIds.isEmpty()) {
+            return false
+        }
         
-        // 指定されたタイトルの書籍を取得（除外IDを除く）
-        val booksWithTitle = dsl.select(BOOKS.ID)
-            .from(BOOKS)
-            .where(BOOKS.TITLE.eq(title))
-            .and(BOOKS.ID.ne(excludeBookId))
+        val booksWithTitle = dsl.select(Books.BOOKS.ID)
+            .from(Books.BOOKS)
+            .where(Books.BOOKS.TITLE.eq(title))
+            .and(Books.BOOKS.ID.ne(excludeBookId))
             .fetch()
-            .map { it.get(BOOKS.ID) }
+            .map { it.get(Books.BOOKS.ID)!! }
         
-        if (booksWithTitle.isEmpty()) return false
+        if (booksWithTitle.isEmpty()) {
+            return false
+        }
         
-        // 各書籍について、著者IDリストが完全一致するかチェック
+        val authorIdsSet = authorIds.toSet()
         for (bookId in booksWithTitle) {
-            val bookAuthorIds = dsl.select(BOOK_AUTHORS.AUTHOR_ID)
-                .from(BOOK_AUTHORS)
-                .where(BOOK_AUTHORS.BOOK_ID.eq(bookId))
+            val bookAuthorIds = dsl.select(BookAuthors.BOOK_AUTHORS.AUTHOR_ID)
+                .from(BookAuthors.BOOK_AUTHORS)
+                .where(BookAuthors.BOOK_AUTHORS.BOOK_ID.eq(bookId))
                 .fetch()
-                .map { it.get(BOOK_AUTHORS.AUTHOR_ID) }
-                .sorted()
+                .map { it.get(BookAuthors.BOOK_AUTHORS.AUTHOR_ID)!! }
+                .toSet()
             
-            if (bookAuthorIds == authorIds.sorted()) {
+            if (bookAuthorIds == authorIdsSet) {
                 return true
             }
         }
         
         return false
-    }
-    
-    override fun findByIdWithAuthors(id: Long): Book? {
-        val result = dsl.select(
-            BOOKS.ID,
-            BOOKS.TITLE,
-            BOOKS.PRICE,
-            BOOKS.PUBLICATION_STATUS,
-            AUTHORS.ID,
-            AUTHORS.NAME,
-            AUTHORS.BIRTH_DATE
-        )
-            .from(BOOKS)
-            .leftJoin(BOOK_AUTHORS).on(BOOKS.ID.eq(BOOK_AUTHORS.BOOK_ID))
-            .leftJoin(AUTHORS).on(BOOK_AUTHORS.AUTHOR_ID.eq(AUTHORS.ID))
-            .where(BOOKS.ID.eq(id))
-            .fetch()
-        
-        if (result.isEmpty()) return null
-        
-        val firstRecord = result.first()
-        val authors = result.mapNotNull { record ->
-            if (record.get(AUTHORS.ID) != null) {
-                Author(
-                    id = record.get(AUTHORS.ID),
-                    name = record.get(AUTHORS.NAME),
-                    birthDate = record.get(AUTHORS.BIRTH_DATE)
-                )
-            } else null
-        }.distinctBy { it.id }
-        
-        return Book(
-            id = firstRecord.get(BOOKS.ID),
-            title = firstRecord.get(BOOKS.TITLE),
-            price = Price.of(firstRecord.get(BOOKS.PRICE)),
-            publicationStatus = PublicationStatus.entries[firstRecord.get(BOOKS.PUBLICATION_STATUS).toInt()],
-            authors = authors
-        )
-    }
-    
-    override fun updateBasicInfo(id: Long, title: String, price: Price): Book {
-        val record = dsl.update(BOOKS)
-            .set(BOOKS.TITLE, title)
-            .set(BOOKS.PRICE, price.toInt())
-            .where(BOOKS.ID.eq(id))
-            .returning()
-            .fetchOne()
-            ?: throw IllegalStateException("書籍の更新に失敗しました。ID: $id")
-        
-        return Book(
-            id = record.id,
-            title = record.title,
-            price = Price.of(record.price),
-            publicationStatus = PublicationStatus.entries[record.publicationStatus.toInt()]
-        )
-    }
-    
-    override fun updatePublicationStatus(id: Long, publicationStatus: PublicationStatus): Book {
-        val record = dsl.update(BOOKS)
-            .set(BOOKS.PUBLICATION_STATUS, publicationStatus.ordinal.toShort())
-            .where(BOOKS.ID.eq(id))
-            .returning()
-            .fetchOne()
-            ?: throw IllegalStateException("出版状況の更新に失敗しました。ID: $id")
-        
-        return Book(
-            id = record.id,
-            title = record.title,
-            price = Price.of(record.price),
-            publicationStatus = PublicationStatus.entries[record.publicationStatus.toInt()]
-        )
-    }
-    
-    override fun findByIds(ids: List<Long>): List<Book> {
-        if (ids.isEmpty()) return emptyList()
-        
-        val result = dsl.select(
-            BOOKS.ID,
-            BOOKS.TITLE,
-            BOOKS.PRICE,
-            BOOKS.PUBLICATION_STATUS,
-            AUTHORS.ID,
-            AUTHORS.NAME,
-            AUTHORS.BIRTH_DATE
-        )
-            .from(BOOKS)
-            .leftJoin(BOOK_AUTHORS).on(BOOKS.ID.eq(BOOK_AUTHORS.BOOK_ID))
-            .leftJoin(AUTHORS).on(BOOK_AUTHORS.AUTHOR_ID.eq(AUTHORS.ID))
-            .where(BOOKS.ID.`in`(ids))
-            .fetch()
-        
-        return result.groupBy { it.get(BOOKS.ID) }
-            .map { (bookId, records) ->
-                val firstRecord = records.first()
-                val authors = records.mapNotNull { record ->
-                    if (record.get(AUTHORS.ID) != null) {
-                        Author(
-                            id = record.get(AUTHORS.ID),
-                            name = record.get(AUTHORS.NAME),
-                            birthDate = record.get(AUTHORS.BIRTH_DATE)
-                        )
-                    } else null
-                }.distinctBy { it.id }
-                
-                Book(
-                    id = bookId,
-                    title = firstRecord.get(BOOKS.TITLE),
-                    price = Price.of(firstRecord.get(BOOKS.PRICE)),
-                    publicationStatus = PublicationStatus.entries[firstRecord.get(BOOKS.PUBLICATION_STATUS).toInt()],
-                    authors = authors
-                )
-            }
     }
 }
