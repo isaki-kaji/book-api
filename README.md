@@ -22,7 +22,7 @@
 
 # 別ターミナルで、データベース起動を待ってからjOOQコード生成を実行
 # ※ 初回のみ必要
-sleep 10 && ./gradlew jooqCodegen
+./gradlew jooqCodegen
 ```
 
 ### 3. 通常の起動
